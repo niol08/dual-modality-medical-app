@@ -1,0 +1,8 @@
+streamlit
+numpy
+pandas
+scikit-learn
+pillow
+mne      
+nibabel            
+pydicom           
