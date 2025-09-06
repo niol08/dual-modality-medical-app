@@ -5,4 +5,10 @@ scikit-learn
 pillow
 mne      
 nibabel            
-pydicom           
+pydicom  
+torch
+huggingface_hub
+safetensors
+tensorflow
+transformers         
+mne
