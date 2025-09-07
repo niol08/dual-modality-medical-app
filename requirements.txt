@@ -17,3 +17,7 @@ transformers
 huggingface-hub
 tensorflow
 google-generativeai
+libgl1
+python-dotenv
+requests
+libgl1-mesa-glx
