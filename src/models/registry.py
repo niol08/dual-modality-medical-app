@@ -7,13 +7,13 @@ _MODEL_MAP = {
     "ERP": "src.models.biosignal.eeg_model.EEGModel",
     "EOG": "src.models.biosignal.eeg_model.EEGModel",
     "EMG": "src.models.biosignal.eeg_model.EEGModel",
-    "MRI (biosignal)": "src.models.biosignal.eeg_model.EEGModel",
+    "ECG": "src.models.biosignal.eeg_model.EEGModel",
     # imaging
     "MRI": "src.models.imaging.mri_model.MRIModel",
     "CT": "src.models.imaging.mri_model.MRIModel",
     "X-ray": "src.models.imaging.mri_model.MRIModel",
     "PET": "src.models.imaging.mri_model.MRIModel",
-    "Angiogram": "src.models.imaging.mri_model.MRIModel",
+     "Angiogram": "src.models.imaging.deepsa.wrapper.DeepSAWrapper",
 }
 
 _SINGLETONS = {}

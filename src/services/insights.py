@@ -1,12 +1,39 @@
+import requests
+import os
+from dotenv import load_dotenv
 
-def make_insight(modality, label, confidence):
-    """
-    Small heuristic-based insight generator for the demo.
-    Replace with LLM-based summarizer or rule-based clinical insights (with validation).
-    """
-    conf = float(confidence or 0.0)
-    if conf < 0.5:
-        return f"Low confidence ({conf:.2f}). Consider re-acquiring higher quality {modality} data or re-running with different preprocessing."
-    if "normal" in label.lower() or "no" in label.lower():
-        return f"Model suggests '{label}' with confidence {conf:.2f}. This appears benign, but confirm with clinical workflow."
-    return f"Model suggests '{label}' with confidence {conf:.2f}. Consider specialist review and correlation with clinical context."
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+def query_gemini_flash(modality: str, label: str, confidence: float) -> str:
+    if not GEMINI_API_KEY:
+        return "Gemini API key missing – no explanation generated."
+
+    prompt = (
+        f"Explain the meaning of a {modality} signal classified as '{label}' "
+        f"with a confidence of {confidence:.1%} in a medical diagnostic context."
+    )
+
+    payload = {
+        "contents": [
+            {
+                "parts": [{"text": prompt}]
+            }
+        ]
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-goog-api-key": GEMINI_API_KEY,
+    }
+
+    try:
+        resp = requests.post(GEMINI_ENDPOINT, headers=headers, json=payload, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        return f"Gemini API error: {str(e)}"

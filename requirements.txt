@@ -6,3 +6,14 @@ pillow
 mne      
 nibabel            
 pydicom           
+torch
+torchvision
+pydicom
+nibabel
+opencv-python
+gradio
+albumentations
+transformers
+huggingface-hub
+tensorflow
+google-generativeai

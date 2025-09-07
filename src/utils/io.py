@@ -18,7 +18,7 @@ def render_image_preview(path):
     if ext.endswith((".png", ".jpg", ".jpeg")):
         img = Image.open(path)
         st = __import__("streamlit")
-        st.image(img, use_column_width=True)
+        st.image(img, use_container_width=True)
         return
 
     try:
@@ -27,7 +27,7 @@ def render_image_preview(path):
         if hasattr(ds, 'pixel_array'):
             arr = ds.pixel_array
             st = __import__("streamlit")
-            st.image(arr, use_column_width=True)
+            st.image(arr, use_container_width=True)
             return
     except Exception:
         pass
@@ -42,7 +42,7 @@ def render_image_preview(path):
         sl = slice - slice.min()
         sl = (sl / (sl.max() + 1e-9) * 255).astype(np.uint8)
         st = __import__("streamlit")
-        st.image(sl, use_column_width=True)
+        st.image(sl, use_container_width=True)
         return
     except Exception:
         pass
