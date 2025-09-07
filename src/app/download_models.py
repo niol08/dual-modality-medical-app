@@ -29,16 +29,12 @@ def get_model_urls():
     try:
      return{
       "../models/MLII-latest.keras": st.secrets["ECG_MODEL_URL"],
-      "../models/pcg_model.h5": st.secrets["PCG_MODEL_URL"],
       "../models/emg_model.h5": st.secrets["EMG_MODEL_URL"],
-      "../models/vag_feature_classifier.pkl": st.secrets["VAG_MODEL_URL"]
      }
     except:
      return{
       "../models/MLII-latest.keras": os.getenv("ECG_MODEL_URL", ""),
-      "../models/pcg_model.h5": os.getenv("PCG_MODEL_URL", ""),
       "../models/emg_model.h5": os.getenv("EMG_MODEL_URL", ""),
-      "../models/vag_feature_classifier.pkl": os.getenv("VAG_MODEL_URL", "") 
      }
 
 def download_from_gdrive(url, output_path):
@@ -47,7 +43,7 @@ def download_from_gdrive(url, output_path):
     
    
     file_id = extract_file_id_from_url(url)
-    
+
     
     download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
     gdown.download(download_url, output_path, quiet=False)
