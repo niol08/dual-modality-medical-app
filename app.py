@@ -4,6 +4,7 @@ import streamlit as st
 from src.services.inference import run_inference
 from src.utils.io import save_upload_to_tempfile, render_image_preview
 from dotenv import load_dotenv
+from src.services.insights import query_gemini_flash
 
 
 load_dotenv()
@@ -13,7 +14,7 @@ st.title("DualTech Bot — Biosignal & Medical Imaging (demo)")
 
 mode = st.sidebar.selectbox("Mode", ["Biosignal", "Medical Imaging"])
 if mode == "Biosignal":
-    modalities = ["EEG", "ERP", "EOG", "EMG"]
+    modalities = ["EEG", "ERP", "EOG", "EMG","ECG"]
 else:
     modalities = ["MRI", "CT", "X-ray", "PET", "Angiogram"]
 
@@ -80,6 +81,22 @@ elif modality == "EMG":
 else:
     with st.spinner(f"Running {modality} model..."):
         result = run_inference(modality, tmp_path)
+
+# Attach Gemini AI insight for biosignal modalities when possible
+try:
+    if modality in ("EEG", "ERP", "EOG", "ECG", "EMG") and result:
+        label_name = result.get("label") or result.get("prediction") or result.get("label_name") or "unknown"
+        try:
+            confidence = float(result.get("confidence") or result.get("score") or 0.0)
+        except Exception:
+            confidence = 0.0
+        try:
+            result["ai_insight"] = query_gemini_flash(modality, label_name, confidence)
+        except Exception as e:
+            result["ai_insight"] = f"Gemini error: {e}"
+except Exception:
+    # keep silent if something unexpected happens building the insight
+    pass
 
 result = _normalize_result(result or {})
 
