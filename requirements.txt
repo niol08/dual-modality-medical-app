@@ -10,7 +10,7 @@ torch
 torchvision
 pydicom
 nibabel
-opencv-python
+# opencv-python
 gradio
 albumentations
 transformers
@@ -20,4 +20,4 @@ google-generativeai
 opencv-python-headless
 python-dotenv
 requests
-libgl1-mesa-glx
+# libgl1-mesa-glx
