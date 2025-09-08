@@ -17,7 +17,7 @@ transformers
 huggingface-hub
 tensorflow
 google-generativeai
-libgl1
+opencv-python-headless
 python-dotenv
 requests
 libgl1-mesa-glx
