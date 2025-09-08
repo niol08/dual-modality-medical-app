@@ -20,4 +20,5 @@ google-generativeai
 opencv-python-headless
 python-dotenv
 requests
+scikit-image
 # libgl1-mesa-glx
