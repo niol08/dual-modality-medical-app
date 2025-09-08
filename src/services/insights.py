@@ -5,13 +5,10 @@ import streamlit as st
 
 load_dotenv()
 
-if os.getenv("GEMINI_API_KEY"):
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-else:
-    try:
-        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    except Exception:
-        GEMINI_API_KEY = ""
+try:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
