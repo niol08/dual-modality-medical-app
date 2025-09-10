@@ -8,10 +8,9 @@ from huggingface_hub import hf_hub_download
 import tensorflow as tf
 from tensorflow import keras
 import joblib
-import tempfile
-import os
 
-from graph import zeropad, zeropad_output_shape
+
+from .graph import zeropad, zeropad_output_shape
 
 class HuggingFaceSpaceClient:
     def __init__(self, hf_token: str):
@@ -57,10 +56,6 @@ class HuggingFaceSpaceClient:
                     },
                     compile=False
                 )
-                
-            elif signal_type == "PCG":
-                st.info("🧠 Loading PCG Keras model...")
-                model = keras.models.load_model(model_path, compile=False)
                 
             elif signal_type == "EMG":
                 st.info("Loading EMG Keras model...")
@@ -132,44 +127,7 @@ class HuggingFaceSpaceClient:
         
         return predicted_label, human_readable, confidence
 
-    def predict_pcg(self, uploaded_file) -> Tuple[str, str, float]:
-        """Predict PCG using pcg_model.h5 from HuggingFace"""
-        
-        model = self._download_and_load_model("PCG")
-        
-
-        audio_data, sr = sf.read(uploaded_file)
-        uploaded_file.seek(0)
-        
-        if len(audio_data.shape) > 1:
-            audio_data = np.mean(audio_data, axis=1)
-        
-        if len(audio_data) > 995:
-            audio_data = audio_data[:995]
-        elif len(audio_data) < 995:
-            audio_data = np.pad(audio_data, (0, 995 - len(audio_data)))
-        
-
-        model_input = audio_data.reshape(1, 995, 1)
-        
-        st.info("Running PCG prediction with HuggingFace model...")
-
-        predictions = model.predict(model_input, verbose=0)
-        predicted_class_idx = np.argmax(predictions[0])
-        confidence = float(predictions[0][predicted_class_idx])
-        
-        pcg_classes = [
-            "Normal",
-            "Aortic Stenosis", 
-            "Mitral Stenosis",
-            "Mitral Valve Prolapse",
-            "Pericardial Murmurs"
-        ]
-        
-        predicted_label = pcg_classes[predicted_class_idx] if predicted_class_idx < len(pcg_classes) else "Normal"
-        
-        return predicted_label, predicted_label, confidence
-
+    
     def predict_emg(self, uploaded_file) -> Tuple[str, float]:
         """Predict EMG using emg_classifier_txt.h5 from HuggingFace"""
         
