@@ -9,10 +9,9 @@ from huggingface_hub import hf_hub_download
 import tensorflow as tf
 from tensorflow import keras
 import joblib
-import tempfile
-import os
 
-from src.app.graph import zeropad, zeropad_output_shape
+
+from .graph import zeropad, zeropad_output_shape
 
 class HuggingFaceSpaceClient:
     def __init__(self, hf_token: str):
@@ -21,8 +20,10 @@ class HuggingFaceSpaceClient:
         
 
         self.models = {
-            "ECG": "MLII-latest.keras", 
+            "ECG": "MLII-latest.keras",
+            "PCG": "pcg_model.h5", 
             "EMG": "emg_classifier_txt.h5",
+            "VAG": "vag_feature_classifier.pkl"
         }
         
         self.loaded_models = {}
@@ -103,6 +104,12 @@ class HuggingFaceSpaceClient:
             elif signal_type == "EMG":
                 st.info("Loading EMG Keras model...")
                 model = keras.models.load_model(model_path, compile=False)
+                
+            elif signal_type == "VAG":
+                st.info("Loading VAG Scikit-learn model...")
+
+                vag_dict = joblib.load(model_path)
+                model = vag_dict  
 
             self.loaded_models[signal_type] = model
             st.success(f"{signal_type} model loaded successfully!")
@@ -168,8 +175,7 @@ class HuggingFaceSpaceClient:
 
         return predicted_label, human_readable, confidence
 
-   
-        
+    
     def predict_emg(self, uploaded_file) -> Tuple[str, float]:
         """Predict EMG using emg_classifier_txt.h5 from HuggingFace"""
         model = self._download_and_load_model("EMG")
@@ -219,4 +225,42 @@ class HuggingFaceSpaceClient:
 
         return predicted_label, confidence
 
-   
+    def predict_vag(self, uploaded_file) -> Tuple[str, str, float]:
+        """Predict VAG using vag_feature_classifier.pkl from HuggingFace"""
+        vag_dict = self._download_and_load_model("VAG")
+        
+        model = vag_dict["model"]         
+        scaler = vag_dict["scaler"]       
+        encoder = vag_dict["encoder"]    
+        content = uploaded_file.read().decode('utf-8')
+        uploaded_file.seek(0)
+        
+        df = pd.read_csv(io.StringIO(content))
+        
+
+        required_features = ['rms_amplitude', 'peak_frequency', 'spectral_entropy', 
+                           'zero_crossing_rate', 'mean_frequency']
+        
+        if not all(feature in df.columns for feature in required_features):
+            raise Exception(f"Missing required features. Need: {required_features}")
+        
+        features = df[required_features].iloc[0].values.reshape(1, -1)
+        features_scaled = scaler.transform(features)
+        
+        st.info("Running VAG prediction with HuggingFace model...")
+        
+        prediction_encoded = model.predict(features_scaled)[0]
+        
+        probabilities = model.predict_proba(features_scaled)[0]
+        confidence = float(np.max(probabilities))
+
+        prediction_label = encoder.inverse_transform([prediction_encoded])[0]
+        human_map = {
+            'normal': 'Normal Knee Joint',
+            'osteoarthritis': 'Osteoarthritis Detected',
+            'ligament_injury': 'Ligament Injury Detected'
+        }
+        
+        human_readable = human_map.get(prediction_label, 'Normal Knee Joint')
+        
+        return prediction_label.title(), human_readable, confidence

@@ -21,7 +21,7 @@ else:
 modality = st.sidebar.selectbox("Modality", modalities)
 st.sidebar.markdown("Upload a data file supported by the modality (CSV/EDF for biosignals; DICOM/NIfTI/JPEG/PNG for images).")
 
-uploaded_file = st.file_uploader(f"Upload {modality} file", type=["edf","bdf","csv","npy","nii","nii.gz","dcm","dcm.zip","jpg","jpeg","png","dicom","zip"])
+uploaded_file = st.file_uploader(f"Upload {modality} file", type=["edf","bdf","csv","npy","nii","nii.gz","dcm","dcm.zip","jpg","jpeg","png","dicom","zip","txt"])
 
 if uploaded_file is None:
     st.info("Upload a sample file from `sample_data/` or your device to begin.")
