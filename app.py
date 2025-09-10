@@ -9,6 +9,41 @@ from src.services.insights import query_gemini_flash
 
 load_dotenv()
 
+try:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+    HF_TOKEN = st.secrets["HF_TOKEN"]
+except Exception:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    HF_TOKEN = os.getenv("HF_TOKEN", "")
+
+
+# allowed upload file types per modality (used to tighten uploader)
+FILE_TYPES = {
+    "EEG": ["edf", "bdf"],
+    "ERP": ["edf", "bdf", "csv"],
+    "EOG": ["edf", "bdf", "csv"],
+    "ECG": ["csv", "txt", "npy"],
+    "EMG": ["csv", "txt", "npy"],
+    "MRI": ["nii", "nii.gz", "dcm"],
+    "CT": ["nii", "nii.gz", "dcm"],
+    "X-ray": ["jpg", "jpeg", "png", "dcm"],
+    "PET": ["nii", "nii.gz", "dcm"],
+}
+
+
+@st.cache_resource
+def get_hf_client():
+    if not HF_TOKEN:
+        return None
+    try:
+        from app.model_loader import HuggingFaceSpaceClient
+        return HuggingFaceSpaceClient(hf_token=HF_TOKEN)
+    except Exception:
+        return None
+
+
+hf_client = get_hf_client()
+
 st.set_page_config(page_title="DualTech Bot", layout="wide")
 st.title("DualTech Bot — Biosignal & Medical Imaging (demo)")
 
@@ -21,7 +56,8 @@ else:
 modality = st.sidebar.selectbox("Modality", modalities)
 st.sidebar.markdown("Upload a data file supported by the modality (CSV/EDF for biosignals; DICOM/NIfTI/JPEG/PNG for images).")
 
-uploaded_file = st.file_uploader(f"Upload {modality} file", type=["edf","bdf","csv","npy","nii","nii.gz","dcm","dcm.zip","jpg","jpeg","png","dicom","zip","txt"])
+allowed = FILE_TYPES.get(modality, None)
+uploaded_file = st.file_uploader(f"Upload {modality} file", type=allowed)
 
 if uploaded_file is None:
     st.info("Upload a sample file from `sample_data/` or your device to begin.")
@@ -65,14 +101,26 @@ elif modality == "EOG":
     with st.spinner(f"Running {modality} analyzer..."):
         result = run_eog_wrapper(uploaded_file)
 elif modality == "ECG":
-        from src.app.load_models import HuggingFaceSpaceClient
+    # Prefer the cached HF client if available
+    if hf_client is not None:
+        with st.spinner(f"Running {modality} HuggingFace model..."):
+            predicted_label, human_readable, confidence = hf_client.predict_ecg(uploaded_file)
+        result = {"prediction": predicted_label, "ai_insight": human_readable, "confidence": float(confidence)}
+    else:
+        # fallback to local loader (keeps previous behavior)
+        from app.model_loader import HuggingFaceSpaceClient
         hf_token = os.getenv("HF_TOKEN")
         client = HuggingFaceSpaceClient(hf_token=hf_token)
         with st.spinner(f"Running {modality} HuggingFace model..."):
             predicted_label, human_readable, confidence = client.predict_ecg(uploaded_file)
         result = {"prediction": predicted_label, "ai_insight": human_readable, "confidence": float(confidence)}
 elif modality == "EMG":
-        from src.app.load_models import HuggingFaceSpaceClient
+    if hf_client is not None:
+        with st.spinner(f"Running {modality} HuggingFace model..."):
+            predicted_label, confidence = hf_client.predict_emg(uploaded_file)
+        result = {"prediction": predicted_label, "confidence": float(confidence)}
+    else:
+        from app.model_loader import HuggingFaceSpaceClient
         hf_token = os.getenv("HF_TOKEN")
         client = HuggingFaceSpaceClient(hf_token=hf_token)
         with st.spinner(f"Running {modality} HuggingFace model..."):
