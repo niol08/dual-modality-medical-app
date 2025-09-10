@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from typing import Tuple
 import io
+from pathlib import Path
 from huggingface_hub import hf_hub_download
 import tensorflow as tf
 from tensorflow import keras
@@ -25,6 +26,49 @@ class HuggingFaceSpaceClient:
         }
         
         self.loaded_models = {}
+
+    def _save_uploaded_tmp(self, uploaded_file) -> str:
+        suffix = Path(uploaded_file.name).suffix or ".tmp"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(uploaded_file.getbuffer())
+            tmp.flush()
+            return tmp.name
+
+    def _load_signal_array(self, path: str) -> np.ndarray:
+        """Flexible loader for numeric signal files (CSV, TXT, NPY).
+        Returns 1D or 2D numpy array of float32.
+        """
+        ext = Path(path).suffix.lower()
+        if ext == ".npy":
+            return np.load(path).astype(np.float32)
+
+        if ext in (".csv", ".txt", ".dat", ""):
+            # try to infer separator (comma/whitespace)
+            try:
+                df = pd.read_csv(path, header=None, comment="#", sep=None, engine="python")
+            except Exception:
+                df = pd.read_csv(path, header=None, comment="#", delim_whitespace=True)
+
+            # keep numeric columns
+            num = df.select_dtypes(include=[np.number])
+            if num.empty:
+                coerced = df.apply(pd.to_numeric, errors="coerce")
+                coerced = coerced.dropna(how="all")
+                if coerced.empty:
+                    raise Exception("No numeric data found in file")
+                arr = coerced.values.astype(np.float32)
+            else:
+                arr = num.values.astype(np.float32)
+
+            if arr.ndim == 2 and arr.shape[1] == 1:
+                return arr[:, 0]
+            return arr
+
+        # fallback
+        try:
+            return np.loadtxt(path).astype(np.float32)
+        except Exception:
+            raise Exception(f"Unsupported or unreadable file extension: {ext}")
     
     def _download_and_load_model(self, signal_type: str):
         """Download and load model from HuggingFace Hub"""
@@ -71,40 +115,44 @@ class HuggingFaceSpaceClient:
 
     def predict_ecg(self, uploaded_file) -> Tuple[str, str, float]:
         """Predict ECG using MLII-latest.keras from HuggingFace"""
-
         model = self._download_and_load_model("ECG")
 
-        content = uploaded_file.read().decode('utf-8')
-        uploaded_file.seek(0)
-        
-        lines = content.strip().split('\n')
-        data = []
-        for line in lines:
-            if ',' in line:
-                values = [float(x.strip()) for x in line.split(',') if x.strip()]
-                data.extend(values)
+        tmp = self._save_uploaded_tmp(uploaded_file)
+        try:
+            data = self._load_signal_array(tmp)
+        finally:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+
+        # Convert to 1D signal
+        if data.ndim == 2:
+            if data.shape[1] >= 1:
+                sig = data[:, 0]
             else:
-                try:
-                    data.append(float(line.strip()))
-                except ValueError:
-                    continue
-        
-        if len(data) == 0:
+                sig = data.ravel()
+        else:
+            sig = data
+
+        if sig.size == 0:
             raise Exception("No numeric data found in ECG file")
-        
-        if len(data) > 256:
-            data = data[:256]
-        elif len(data) < 256:
-            data.extend([0.0] * (256 - len(data)))
-        
-        model_input = np.array(data).reshape(1, 256, 1)
-        
+
+        # pad/truncate to 256
+        if sig.size > 256:
+            sig = sig[:256]
+        elif sig.size < 256:
+            pad = np.zeros(256 - sig.size, dtype=np.float32)
+            sig = np.concatenate([sig.astype(np.float32), pad])
+
+        model_input = np.array(sig).reshape(1, 256, 1)
+
         st.info("Running ECG prediction with HuggingFace model...")
-        
+
         predictions = model.predict(model_input, verbose=0)
         predicted_class_idx = np.argmax(predictions[0])
         confidence = float(predictions[0][predicted_class_idx])
-        
+
         ecg_classes = ["N", "V", "/", "A", "F", "~"]
         class_names = {
             "N": "Normal sinus beat",
@@ -114,49 +162,52 @@ class HuggingFaceSpaceClient:
             "F": "Fusion of ventricular & normal beat",
             "~": "Unclassifiable / noise"
         }
-        
+
         predicted_label = ecg_classes[predicted_class_idx]
-        human_readable = class_names[predicted_label]
-        
+        human_readable = class_names.get(predicted_label, "Unknown")
+
         return predicted_label, human_readable, confidence
 
    
         
     def predict_emg(self, uploaded_file) -> Tuple[str, float]:
         """Predict EMG using emg_classifier_txt.h5 from HuggingFace"""
-        
         model = self._download_and_load_model("EMG")
-        
 
-        content = uploaded_file.read().decode('utf-8')
-        uploaded_file.seek(0)
-        
-        lines = content.strip().split('\n')
-        data = []
-        for line in lines:
-            if ',' in line:
-                values = [float(x.strip()) for x in line.split(',') if x.strip()]
-                data.extend(values)
+        tmp = self._save_uploaded_tmp(uploaded_file)
+        try:
+            data = self._load_signal_array(tmp)
+        finally:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+
+        # ensure 1D signal
+        if data.ndim == 2:
+            # if multi-column, take mean across channels
+            if data.shape[1] > 1:
+                sig = data.mean(axis=1)
             else:
-                try:
-                    data.append(float(line.strip()))
-                except ValueError:
-                    continue
-        
-        if len(data) == 0:
-            raise Exception("No numeric data found in EMG file")
-    
-        if len(data) > 1000:
-            data = data[:1000]
-        elif len(data) < 1000:
-            data.extend([0.0] * (1000 - len(data)))
-        
+                sig = data[:, 0]
+        else:
+            sig = data
 
-        data_array = np.array(data)
+        if sig.size == 0:
+            raise Exception("No numeric data found in EMG file")
+
+        # pad/truncate to 1000
+        if sig.size > 1000:
+            sig = sig[:1000]
+        elif sig.size < 1000:
+            pad = np.zeros(1000 - sig.size, dtype=np.float32)
+            sig = np.concatenate([sig.astype(np.float32), pad])
+
+        data_array = sig.astype(np.float32)
         normalized_data = (data_array - data_array.mean()) / (data_array.std() + 1e-6)
-        
+
         model_input = normalized_data.reshape(1, 1000, 1)
-        
+
         st.info("Running EMG prediction with HuggingFace model...")
 
         predictions = model.predict(model_input, verbose=0)
@@ -165,7 +216,7 @@ class HuggingFaceSpaceClient:
 
         emg_classes = ["healthy", "myopathy", "neuropathy"]
         predicted_label = emg_classes[predicted_class_idx] if predicted_class_idx < len(emg_classes) else "healthy"
-        
+
         return predicted_label, confidence
 
    
