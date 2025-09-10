@@ -5,7 +5,7 @@ scikit-learn
 pillow
 mne      
 nibabel            
-pydicom           
+pydicom  
 torch
 torchvision
 pydicom
@@ -21,4 +21,9 @@ opencv-python-headless
 python-dotenv
 requests
 scikit-image
-# libgl1-mesa-glx
+# libgl1-mesa-glxtorch
+huggingface_hub
+safetensors
+tensorflow
+transformers         
+mne
