@@ -10,7 +10,7 @@ torch
 torchvision
 #opencv-python
 gradio
-tranformers
+transformers
 huggingface-hub
 tensorflow
 albumentations
