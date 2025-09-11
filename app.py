@@ -45,7 +45,7 @@ def get_hf_client():
 hf_client = get_hf_client()
 
 st.set_page_config(page_title="DualTech Bot", layout="wide")
-st.title("DualTech Bot — Biosignal & Medical Imaging (demo)")
+st.title("DualTech Bot — Biosignal & Medical Imaging")
 
 mode = st.sidebar.selectbox("Mode", ["Biosignal", "Medical Imaging"])
 if mode == "Biosignal":
@@ -196,5 +196,5 @@ with col2:
         st.text("Preview not available for this file type.")
 
 st.markdown("---")
-st.caption("This is a demo scaffold. Replace model stubs in `src/models/` with production models and implement rigorous validation before any clinical use.")
+st.caption("This is a demo. Implement rigorous validation before any clinical use.")
  

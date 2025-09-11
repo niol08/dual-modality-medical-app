@@ -3,3 +3,10 @@
 __pycache__/
 
 venv/
+.vscode/
+examples/*.*
+Report.docx
+sample_ecg.csv
+sample_emg.txt
+test_pcg.wav
+test_vag.csv
