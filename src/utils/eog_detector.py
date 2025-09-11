@@ -120,55 +120,53 @@ def run_eog_detector(uploaded_file,
         if raw is None:
             # try reading EDF; let exceptions propagate as informative errors
             raw = mne.io.read_raw_edf(tmp_edf, preload=True, verbose='ERROR')
-    raw = _pick_eog_raw(raw)
-    raw = _preprocess_raw_for_windows(raw, target_sfreq=256.0)
-    data = raw.get_data()  
-    sfreq = raw.info['sfreq']
+        raw = _pick_eog_raw(raw)
+        raw = _preprocess_raw_for_windows(raw, target_sfreq=256.0)
+        data = raw.get_data()  
+        sfreq = raw.info['sfreq']
 
-    windows, times = _segment_windows(data, sfreq, win_s=win_s, step_s=step_s, max_windows=max_windows)
-    if not windows:
-        raise RuntimeError("No windows created from EOG.")
+        windows, times = _segment_windows(data, sfreq, win_s=win_s, step_s=step_s, max_windows=max_windows)
+        if not windows:
+            raise RuntimeError("No windows created from EOG.")
 
-    if local_model_path:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = torch.load(local_model_path, map_location=device)
-        model.eval()
-        results = []
-        batch_size = 64
-        for i in range(0, len(windows), batch_size):
-            batch = np.stack(windows[i:i+batch_size])  
-            x = torch.from_numpy(batch).to(device)
-            with torch.inference_mode():
-                logits = model(x).cpu().numpy()
-            probs = softmax(logits, axis=1)
-            for p in probs:
-                results.append({"p_no_disease": float(p[0]), "p_disease": float(p[1])})
-    else:
-        results = []
-        for w in windows:
-            var = float(np.mean(w.var(axis=1)))
-            p_disease = min(0.9, var / (var + 1.0))
-            results.append({"p_no_disease": 1.0 - p_disease, "p_disease": p_disease})
+        if local_model_path:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model = torch.load(local_model_path, map_location=device)
+            model.eval()
+            results = []
+            batch_size = 64
+            for i in range(0, len(windows), batch_size):
+                batch = np.stack(windows[i:i+batch_size])  
+                x = torch.from_numpy(batch).to(device)
+                with torch.inference_mode():
+                    logits = model(x).cpu().numpy()
+                probs = softmax(logits, axis=1)
+                for p in probs:
+                    results.append({"p_no_disease": float(p[0]), "p_disease": float(p[1])})
+        else:
+            results = []
+            for w in windows:
+                var = float(np.mean(w.var(axis=1)))
+                p_disease = min(0.9, var / (var + 1.0))
+                results.append({"p_no_disease": 1.0 - p_disease, "p_disease": p_disease})
 
- 
-    p_disease_mean = float(np.mean([r["p_disease"] for r in results]))
-    p_no_mean = float(np.mean([r["p_no_disease"] for r in results]))
-    prediction = "disease" if p_disease_mean > p_no_mean else "no_disease"
-    confidence = max(p_disease_mean, p_no_mean)
+        p_disease_mean = float(np.mean([r["p_disease"] for r in results]))
+        p_no_mean = float(np.mean([r["p_no_disease"] for r in results]))
+        prediction = "disease" if p_disease_mean > p_no_mean else "no_disease"
+        confidence = max(p_disease_mean, p_no_mean)
 
-    per_window = [{"start_s": float(t), "p_no_disease": r["p_no_disease"], "p_disease": r["p_disease"]}
-                  for t, r in zip(times, results)]
+        per_window = [{"start_s": float(t), "p_no_disease": r["p_no_disease"], "p_disease": r["p_disease"]}
+                      for t, r in zip(times, results)]
 
-    return {
-        "model": local_model_path or "hf_space" if use_hf_space else "baseline",
-        "prediction": prediction,
-        "confidence": confidence,
-        "n_windows": len(per_window),
-        "sfreq": float(sfreq),
-        "channels": raw.ch_names,
-        "per_window": per_window,
-    }
-
+        return {
+            "model": local_model_path or "hf_space" if use_hf_space else "baseline",
+            "prediction": prediction,
+            "confidence": confidence,
+            "n_windows": len(per_window),
+            "sfreq": float(sfreq),
+            "channels": raw.ch_names,
+            "per_window": per_window,
+        }
     finally:
         try:
             os.remove(tmp_edf)
