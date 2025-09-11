@@ -99,7 +99,11 @@ elif modality == "EEG":
 elif modality == "EOG":
     from src.pages._EOG import run_eog_wrapper
     with st.spinner(f"Running {modality} analyzer..."):
-        result = run_eog_wrapper(uploaded_file)
+        try:
+            result = run_eog_wrapper(uploaded_file)
+        except Exception as e:
+            st.error(f"EOG analyzer error: {e}")
+            result = {"prediction": None, "confidence": 0.0, "error": str(e)}
 elif modality == "ECG":
     # Prefer the cached HF client if available
     if hf_client is not None:
