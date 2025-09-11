@@ -10,3 +10,5 @@ sample_ecg.csv
 sample_emg.txt
 test_pcg.wav
 test_vag.csv
+
+data/*.*
